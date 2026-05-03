@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
       ai_tool: detectAITool(t.title, t.artist.name),
       external_url: t.link,
       score: 0,
-      is_active: false,
+      is_active: true,
     }))
 
     for (let i = 0; i < rows.length; i += 50) {
