@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '../../lib/supabase'
+import { supabaseAdmin } from '../../lib/supabase-admin'
 
 // Search terms for Deezer track search
 const TRACK_QUERIES = [
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
 
     // 4. Check which external_urls already exist in DB
     const urls = [...unique.values()].map((t) => t.link)
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('songs')
       .select('external_url')
       .in('external_url', urls)
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
 
     for (let i = 0; i < rows.length; i += 50) {
       const batch = rows.slice(i, i + 50)
-      const { error } = await supabase.from('songs').insert(batch)
+      const { error } = await supabaseAdmin.from('songs').insert(batch)
       if (error) {
         stats.errors.push(`Batch ${Math.floor(i / 50) + 1}: ${error.message}`)
       } else {
