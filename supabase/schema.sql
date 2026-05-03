@@ -6,6 +6,10 @@ ALTER TABLE songs
   ADD COLUMN IF NOT EXISTS description  TEXT,
   ADD COLUMN IF NOT EXISTS is_active    BOOLEAN DEFAULT false;
 
+-- Drop the ai_tool CHECK constraint so the harvest job can insert songs
+-- with any ai_tool value (including 'Andere' for undetected tools)
+ALTER TABLE songs DROP CONSTRAINT IF EXISTS songs_ai_tool_check;
+
 -- 2. Chart history (last 4 weeks per song)
 CREATE TABLE IF NOT EXISTS chart_history (
   id         BIGSERIAL PRIMARY KEY,
