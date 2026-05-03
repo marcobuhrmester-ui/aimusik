@@ -1,4 +1,5 @@
 import { unstable_noStore as noStore } from 'next/cache'
+import Link from 'next/link'
 import { supabase } from './lib/supabase'
 
 export default async function Home() {
@@ -20,7 +21,7 @@ export default async function Home() {
         .nav-link { color: #555; text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
         .nav-link:hover { color: #ff6a00; }
         .nav-link.active { color: #ff6a00; }
-        .chart-row { background: transparent; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+        .chart-row { display: grid; grid-template-columns: 48px 1fr 140px 120px; align-items: center; gap: 16px; padding: 14px 20px; background: transparent; border-radius: 8px; cursor: pointer; transition: background 0.15s; text-decoration: none; color: inherit; }
         .chart-row:hover { background: #131313; }
         .submit-btn {
           background: linear-gradient(90deg, #ff4500, #ff8c00);
@@ -102,16 +103,10 @@ export default async function Home() {
           {songs && songs.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {songs.map((song, index) => (
-                <div
+                <Link
                   key={song.id}
+                  href={`/charts/${song.id}`}
                   className="chart-row"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '48px 1fr 140px 120px',
-                    alignItems: 'center',
-                    gap: '16px',
-                    padding: '14px 20px',
-                  }}
                 >
                   {/* Rank */}
                   <div style={{ textAlign: 'center' }}>
@@ -174,7 +169,7 @@ export default async function Home() {
                       }} />
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
