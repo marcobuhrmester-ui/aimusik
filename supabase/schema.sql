@@ -3,7 +3,8 @@
 -- 1. Add new fields to songs table
 ALTER TABLE songs
   ADD COLUMN IF NOT EXISTS external_url TEXT,
-  ADD COLUMN IF NOT EXISTS description  TEXT;
+  ADD COLUMN IF NOT EXISTS description  TEXT,
+  ADD COLUMN IF NOT EXISTS is_active    BOOLEAN DEFAULT false;
 
 -- 2. Chart history (last 4 weeks per song)
 CREATE TABLE IF NOT EXISTS chart_history (

@@ -83,10 +83,10 @@ export default async function SongPage({ params }: { params: { slug: string } })
               </span>
             </Link>
             <nav style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
-              <Link href="/" className="nav-link">Charts</Link>
+              <Link href="/charts" className="nav-link">Charts</Link>
               <a href="#" className="nav-link">Tools</a>
               <a href="#" className="nav-link">Blog</a>
-              <a href="#" className="submit-btn">Submit Song</a>
+              <Link href="/submit" className="submit-btn">Submit Song</Link>
             </nav>
           </div>
         </header>

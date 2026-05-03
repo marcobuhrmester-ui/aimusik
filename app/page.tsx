@@ -67,10 +67,10 @@ export default async function Home() {
 
             {/* Navigation */}
             <nav style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
-              <a href="#" className="nav-link active">Charts</a>
+              <Link href="/charts" className="nav-link">Charts</Link>
               <a href="#" className="nav-link">Tools</a>
               <a href="#" className="nav-link">Blog</a>
-              <a href="#" className="submit-btn">Submit Song</a>
+              <Link href="/submit" className="submit-btn">Submit Song</Link>
             </nav>
           </div>
         </header>
