@@ -223,21 +223,20 @@ async function getSpotifyToken(): Promise<string> {
 }
 
 async function spotifySearchTracks(query: string, token: string): Promise<SpotifyTrack[]> {
-  const urlString = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
-  console.log('[Spotify] GET', urlString)
-  const res = await fetch(urlString, {
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
+  console.log('[Spotify] GET', url)
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+    cache: 'no-store'
   })
   if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    console.log('[Spotify] Fehler bei Query "' + query + '":', res.status, body.slice(0, 300))
+    const body = await res.text()
     throw new Error(`HTTP ${res.status}: ${body.slice(0, 300)}`)
   }
   const json = await res.json()
   const count = (json.tracks?.items as unknown[])?.length ?? 0
-  console.log('[Spotify] Query "' + query + '": ' + count + ' Tracks')
-  return (json.tracks?.items as SpotifyTrack[]) ?? []
+  console.log(`[Spotify] Query "${query}": ${count} Tracks`)
+  return json.tracks?.items ?? []
 }
 
 async function spotifyGetPlaylistTracks(playlistId: string, token: string): Promise<SpotifyTrack[]> {
