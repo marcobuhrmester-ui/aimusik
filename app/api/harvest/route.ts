@@ -91,7 +91,9 @@ async function getSpotifyToken(): Promise<string> {
 
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
-  if (!clientId || !clientSecret) throw new Error('SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET nicht gesetzt')
+  if (!clientId || !clientSecret) {
+    throw new Error('SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET nicht gesetzt')
+  }
 
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -103,25 +105,34 @@ async function getSpotifyToken(): Promise<string> {
     cache: 'no-store',
   })
 
-  if (!res.ok) throw new Error(`Spotify auth HTTP ${res.status}`)
-  const json = await res.json()
-  spotifyTokenCache = { token: json.access_token, expiresAt: Date.now() + (json.expires_in - 60) * 1000 }
+  // Always parse body so we can surface the actual Spotify error message
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok || typeof json.access_token !== 'string' || !json.access_token) {
+    spotifyTokenCache = null
+    const detail = json.error_description ?? json.error ?? JSON.stringify(json)
+    throw new Error(`Spotify Auth HTTP ${res.status}: ${detail}`)
+  }
+
+  spotifyTokenCache = {
+    token: json.access_token as string,
+    expiresAt: Date.now() + ((json.expires_in as number) - 60) * 1000,
+  }
   return spotifyTokenCache.token
 }
 
+// Throws on non-ok responses so the caller can surface the error
 async function spotifySearchTracks(query: string, token: string): Promise<SpotifyTrack[]> {
-  try {
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) return []
-    const json = await res.json()
-    return (json.tracks?.items as SpotifyTrack[]) ?? []
-  } catch {
-    return []
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${body.slice(0, 300)}`)
   }
+  const json = await res.json()
+  return (json.tracks?.items as SpotifyTrack[]) ?? []
 }
 
 // ─── YouTube ───────────────────────────────────────────────────────────────
@@ -264,8 +275,22 @@ export async function GET(request: NextRequest) {
   try {
     const token = await getSpotifyToken()
 
-    const searchResults = await Promise.all(SPOTIFY_QUERIES.map((q) => spotifySearchTracks(q, token)))
-    const allTracks = searchResults.flat()
+    // allSettled so a single failing query doesn't suppress the rest
+    const searchResults = await Promise.allSettled(
+      SPOTIFY_QUERIES.map((q) => spotifySearchTracks(q, token)),
+    )
+
+    const allTracks: SpotifyTrack[] = []
+    for (let i = 0; i < searchResults.length; i++) {
+      const r = searchResults[i]
+      if (r.status === 'fulfilled') {
+        allTracks.push(...r.value)
+      } else {
+        stats.errors.push(
+          `Spotify[${SPOTIFY_QUERIES[i]}]: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+        )
+      }
+    }
 
     const unique = new Map<string, SpotifyTrack>()
     for (const t of allTracks) {
