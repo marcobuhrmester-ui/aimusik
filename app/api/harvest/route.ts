@@ -170,7 +170,7 @@ async function getSpotifyToken(): Promise<string> {
 }
 
 async function spotifySearchTracks(query: string, token: string): Promise<SpotifyTrack[]> {
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track`
   console.log('[Spotify] GET', url)
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
