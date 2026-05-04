@@ -70,6 +70,7 @@ interface DeezerTrack {
   artist: { name: string }
   album: { id: number }
   link: string
+  rank: number
 }
 
 async function deezerFetch(path: string): Promise<Record<string, unknown>> {
@@ -152,6 +153,7 @@ interface SpotifyTrack {
   name: string
   artists: { name: string }[]
   external_urls: { spotify: string }
+  popularity?: number
 }
 
 let spotifyTokenCache: { token: string; expiresAt: number } | null = null
@@ -462,7 +464,7 @@ export async function GET(request: NextRequest) {
           ai_tool: detectAITool(t.title, t.artist.name),
           genre: albumGenreMap.get(t.album?.id) || detectGenre(t.title, t.artist.name),
           external_url: t.link,
-          score: 0,
+          score: Math.max(1, Math.round((t.rank ?? 0) / 1000)),
           is_active: true,
         }))
 
@@ -519,7 +521,7 @@ export async function GET(request: NextRequest) {
           genre: detectGenre(t.name, t.artists.map((a: { name: string }) => a.name).join(' ')),
           external_url: t.external_urls.spotify,
           spotify_id: t.id,
-          score: 0,
+          score: Math.max(1, t.popularity ?? 1),
           is_active: true,
         }))
 
@@ -571,7 +573,7 @@ export async function GET(request: NextRequest) {
             external_url: `https://www.youtube.com/watch?v=${v.id}`,
             youtube_id: v.id,
             cover_url: v.coverUrl || null,
-            score: 0,
+            score: 1,
             is_active: true,
           }
         })
@@ -586,6 +588,10 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     stats.errors.push(`YouTube: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`)
   }
+
+  // ── Recalculate scores ───────────────────────────────────────────────────
+  const { error: rpcError } = await supabaseAdmin.rpc('calculate_scores')
+  if (rpcError) stats.errors.push(`calculate_scores: ${rpcError.message}`)
 
   return NextResponse.json(stats)
 }

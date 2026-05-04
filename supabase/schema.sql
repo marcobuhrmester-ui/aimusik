@@ -21,6 +21,15 @@ ALTER TABLE songs ADD COLUMN IF NOT EXISTS cover_url  TEXT;
 ALTER TABLE songs ADD COLUMN IF NOT EXISTS genre TEXT;
 CREATE INDEX IF NOT EXISTS songs_genre_idx ON songs (genre);
 
+-- Score recalculation function (called after each harvest run)
+CREATE OR REPLACE FUNCTION calculate_scores()
+RETURNS void AS $$
+BEGIN
+  -- Ensure every active song has at least score = 1
+  UPDATE songs SET score = GREATEST(score, 1) WHERE is_active = true;
+END;
+$$ LANGUAGE plpgsql;
+
 -- 2. Chart history (last 4 weeks per song)
 CREATE TABLE IF NOT EXISTS chart_history (
   id         BIGSERIAL PRIMARY KEY,
