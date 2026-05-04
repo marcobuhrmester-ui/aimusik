@@ -4,15 +4,56 @@ import { supabaseAdmin } from '../../lib/supabase-admin'
 // ─── Deezer ────────────────────────────────────────────────────────────────
 
 const DEEZER_TRACK_QUERIES = [
-  'suno ai music',
-  'udio ai generated',
-  'ai generated music',
+  'suno ai',
+  'udio music',
+  'ai generated song',
+  'ai music 2025',
+  'ai music 2026',
   'artificial intelligence music',
-  'aiva music',
-  'boomy ai',
-  'soundraw music',
-  'musicgen ai',
-  'ki musik generiert',
+  'suno generated',
+  'udio generated',
+  'ai vocal music',
+  'ai pop song',
+  'ai rock song',
+  'ai hip hop ai',
+  'ai electronic music',
+  'ai country song',
+  'ai jazz music',
+  'ai blues song',
+  'ai metal song',
+  'ai folk music',
+  'ai rnb song',
+  'ai indie music',
+  'ai dance music',
+  'ai ambient music',
+  'ai classical music',
+  'ai reggae music',
+  'ai soul music',
+  'musicai generated',
+  'ai singer',
+  'ai band music',
+  'ai composer',
+  'ai produced music',
+  'boomy ai music',
+  'aiva music ai',
+  'mubert ai music',
+  'loudly ai music',
+  'beatoven ai',
+  'soundraw ai',
+  'ai music generator',
+  'neural music',
+  'deepmind music',
+  'machine learning music',
+  'ai written song',
+  'computer generated music',
+  'algorithmically generated music',
+  'synthetic music ai',
+  'ai music artist',
+  'ai pop artist',
+  'ai rock artist',
+  'ai music producer',
+  'generative music ai',
+  'ai music chart',
 ]
 
 const DEEZER_PLAYLIST_QUERIES = [
@@ -69,10 +110,63 @@ async function deezerGetPlaylistTracks(id: number): Promise<DeezerTrack[]> {
 
 const SPOTIFY_QUERIES = [
   'suno ai',
-  'udio ai generated',
+  'udio music',
+  'ai generated song',
   'ai music 2025',
+  'ai music 2026',
   'artificial intelligence music',
-  'ai generated music',
+  'suno generated',
+  'udio generated',
+  'ai vocal music',
+  'ai pop song',
+  'ai rock song',
+  'ai hip hop ai',
+  'ai electronic music',
+  'ai country song',
+  'ai jazz music',
+  'ai blues song',
+  'ai metal song',
+  'ai folk music',
+  'ai rnb song',
+  'ai indie music',
+  'ai dance music',
+  'ai ambient music',
+  'ai classical music',
+  'ai reggae music',
+  'ai soul music',
+  'musicai generated',
+  'ai singer',
+  'ai band music',
+  'ai composer',
+  'ai produced music',
+  'boomy ai music',
+  'aiva music ai',
+  'mubert ai music',
+  'loudly ai music',
+  'beatoven ai',
+  'soundraw ai',
+  'ai music generator',
+  'neural music',
+  'deepmind music',
+  'machine learning music',
+  'ai written song',
+  'computer generated music',
+  'algorithmically generated music',
+  'synthetic music ai',
+  'ai music artist',
+  'ai pop artist',
+  'ai rock artist',
+  'ai music producer',
+  'generative music ai',
+  'ai music chart',
+]
+
+const SPOTIFY_PLAYLIST_IDS = [
+  '37i9dQZF1DX7rOY8MkBMFB',
+  '37i9dQZF1DWXIcbzpLauPS',
+  '7sOGAFTOgEfSiGFSNMwrOx',
+  '6tlNnSqPBEJmBxlXJpYJdx',
+  '2YRe7HZKkGGckSbm7rbHNm',
 ]
 
 interface SpotifyTrack {
@@ -128,12 +222,8 @@ async function getSpotifyToken(): Promise<string> {
   return spotifyTokenCache.token
 }
 
-// Throws on non-ok responses so the caller can surface the error
 async function spotifySearchTracks(query: string, token: string): Promise<SpotifyTrack[]> {
-  const url = new URL('https://api.spotify.com/v1/search')
-  url.searchParams.set('q', query)
-  url.searchParams.set('type', 'track')
-  const urlString = url.toString()
+  const urlString = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
   console.log('[Spotify] GET', urlString)
   const res = await fetch(urlString, {
     headers: { Authorization: `Bearer ${token}` },
@@ -150,13 +240,80 @@ async function spotifySearchTracks(query: string, token: string): Promise<Spotif
   return (json.tracks?.items as SpotifyTrack[]) ?? []
 }
 
+async function spotifyGetPlaylistTracks(playlistId: string, token: string): Promise<SpotifyTrack[]> {
+  try {
+    const urlString = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=items(track(id,name,artists,external_urls))`
+    const res = await fetch(urlString, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      console.log(`[Spotify] Playlist ${playlistId} Fehler: ${res.status} ${body.slice(0, 200)}`)
+      return []
+    }
+    const json = await res.json()
+    return ((json.items ?? []) as { track: SpotifyTrack | null }[])
+      .map((item) => item.track)
+      .filter((t): t is SpotifyTrack => t != null && !!t.id && !!t.name && !!t.artists?.length)
+  } catch {
+    return []
+  }
+}
+
 // ─── YouTube ───────────────────────────────────────────────────────────────
 
 const YOUTUBE_QUERIES = [
   'suno ai music',
-  'udio ai generated song',
+  'udio ai song',
   'ai generated music 2025',
+  'ai generated music 2026',
   'artificial intelligence music',
+  'suno ai generated',
+  'udio ai generated',
+  'ai music video',
+  'ai pop music',
+  'ai rock music',
+  'ai hip hop music',
+  'ai electronic song',
+  'ai country music',
+  'ai jazz song',
+  'ai blues music',
+  'ai metal music',
+  'ai folk song',
+  'ai rnb music',
+  'ai indie song',
+  'ai dance song',
+  'ai ambient song',
+  'ai classical song',
+  'ai reggae song',
+  'ai soul song',
+  'ai singer song',
+  'boomy ai song',
+  'aiva ai music',
+  'mubert ai song',
+  'soundraw ai music',
+  'beatoven ai song',
+  'ai music generator song',
+  'neural network music',
+  'machine learning song',
+  'computer generated song',
+  'algorithmically generated song',
+  'synthetic ai music',
+  'ai music artist song',
+  'ai produced song',
+  'generative ai music',
+  'ai music 2025 new',
+  'suno music new',
+  'udio music new',
+  'ai vocal song',
+  'ai band song',
+  'ai composer music',
+  'ai written music',
+  'deepmind music ai',
+  'ai pop artist song',
+  'ai rock artist song',
+  'ai chart music',
 ]
 
 interface YouTubeVideo {
@@ -215,6 +372,9 @@ function detectAITool(title: string, artist: string): string {
   if (t.includes('stable audio')) return 'Stable Audio'
   if (t.includes('musicgen') || t.includes('music gen')) return 'MusicGen'
   if (t.includes('elevenlabs') || t.includes('eleven labs')) return 'ElevenLabs'
+  if (t.includes('mubert')) return 'Mubert'
+  if (t.includes('beatoven')) return 'Beatoven'
+  if (t.includes('loudly')) return 'Loudly'
   return 'Andere'
 }
 
@@ -303,7 +463,7 @@ export async function GET(request: NextRequest) {
   try {
     const token = await getSpotifyToken()
 
-    // allSettled so a single failing query doesn't suppress the rest
+    // Search queries — allSettled so one failure doesn't suppress the rest
     const searchResults = await Promise.allSettled(
       SPOTIFY_QUERIES.map((q) => spotifySearchTracks(q, token)),
     )
@@ -319,6 +479,12 @@ export async function GET(request: NextRequest) {
         )
       }
     }
+
+    // Playlist tracks
+    const playlistResults = await Promise.all(
+      SPOTIFY_PLAYLIST_IDS.map((id) => spotifyGetPlaylistTracks(id, token)),
+    )
+    allTracks.push(...playlistResults.flat())
 
     const unique = new Map<string, SpotifyTrack>()
     for (const t of allTracks) {
