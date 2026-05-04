@@ -92,7 +92,7 @@ async function getSpotifyToken(): Promise<string> {
 
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
-  console.log('[Spotify] Token-Abruf: SPOTIFY_CLIENT_ID gesetzt:', !!clientId, '| SPOTIFY_CLIENT_SECRET gesetzt:', !!clientSecret)
+  console.log('[Spotify] Client ID gesetzt:', !!process.env.SPOTIFY_CLIENT_ID, '| Client Secret gesetzt:', !!process.env.SPOTIFY_CLIENT_SECRET)
   if (!clientId || !clientSecret) {
     throw new Error('SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET nicht gesetzt')
   }
@@ -109,7 +109,7 @@ async function getSpotifyToken(): Promise<string> {
   })
 
   const rawBody = await res.text()
-  console.log('[Spotify] Token-Response: HTTP', res.status, '| Body:', rawBody.slice(0, 500))
+  console.log('[Spotify] Token-Response: HTTP', res.status, '| Body:', rawBody)
 
   let json: Record<string, unknown> = {}
   try { json = JSON.parse(rawBody) } catch { /* non-JSON body */ }
@@ -219,6 +219,24 @@ function detectAITool(title: string, artist: string): string {
   return 'Andere'
 }
 
+// ─── Shared DB helpers ─────────────────────────────────────────────────────
+
+// Splits large ID lists into batches of 100 to avoid 414 URI Too Long from Supabase .in()
+async function checkExistingIds(column: string, ids: string[], batchSize = 100): Promise<Set<string>> {
+  const existing = new Set<string>()
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const { data } = await supabaseAdmin
+      .from('songs')
+      .select(column)
+      .in(column, ids.slice(i, i + batchSize))
+    for (const row of data ?? []) {
+      const val = (row as unknown as Record<string, unknown>)[column]
+      if (val != null) existing.add(String(val))
+    }
+  }
+  return existing
+}
+
 // ─── Route handler ─────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -256,12 +274,7 @@ export async function GET(request: NextRequest) {
     if (unique.size > 0) {
       const uniqueValues = Array.from(unique.values())
       const urls = uniqueValues.map((t) => t.link)
-      const { data: existing } = await supabaseAdmin
-        .from('songs')
-        .select('external_url')
-        .in('external_url', urls)
-
-      const existingSet = new Set((existing ?? []).map((r) => r.external_url))
+      const existingSet = await checkExistingIds('external_url', urls)
       stats.deezer.skipped = existingSet.size
 
       const toInsert = uniqueValues
@@ -316,12 +329,7 @@ export async function GET(request: NextRequest) {
 
     if (unique.size > 0) {
       const spotifyIds = Array.from(unique.keys())
-      const { data: existing } = await supabaseAdmin
-        .from('songs')
-        .select('spotify_id')
-        .in('spotify_id', spotifyIds)
-
-      const existingSet = new Set((existing ?? []).map((r) => r.spotify_id))
+      const existingSet = await checkExistingIds('spotify_id', spotifyIds)
       stats.spotify.skipped = existingSet.size
 
       const toInsert = Array.from(unique.values())
@@ -364,12 +372,7 @@ export async function GET(request: NextRequest) {
 
     if (unique.size > 0) {
       const youtubeIds = Array.from(unique.keys())
-      const { data: existing } = await supabaseAdmin
-        .from('songs')
-        .select('youtube_id')
-        .in('youtube_id', youtubeIds)
-
-      const existingSet = new Set((existing ?? []).map((r) => r.youtube_id))
+      const existingSet = await checkExistingIds('youtube_id', youtubeIds)
       stats.youtube.skipped = existingSet.size
 
       const toInsert = Array.from(unique.values())
