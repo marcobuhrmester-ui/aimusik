@@ -17,6 +17,10 @@ ALTER TABLE songs ADD COLUMN IF NOT EXISTS spotify_id TEXT UNIQUE;
 ALTER TABLE songs ADD COLUMN IF NOT EXISTS youtube_id TEXT UNIQUE;
 ALTER TABLE songs ADD COLUMN IF NOT EXISTS cover_url  TEXT;
 
+-- Genre classification
+ALTER TABLE songs ADD COLUMN IF NOT EXISTS genre TEXT;
+CREATE INDEX IF NOT EXISTS songs_genre_idx ON songs (genre);
+
 -- 2. Chart history (last 4 weeks per song)
 CREATE TABLE IF NOT EXISTS chart_history (
   id         BIGSERIAL PRIMARY KEY,

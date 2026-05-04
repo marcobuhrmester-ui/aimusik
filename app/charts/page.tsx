@@ -2,14 +2,43 @@ import { unstable_noStore as noStore } from 'next/cache'
 import Link from 'next/link'
 import { supabase } from '../lib/supabase'
 
-export default async function ChartsPage() {
+export default async function ChartsPage({
+  searchParams,
+}: {
+  searchParams: { genre?: string }
+}) {
   noStore()
 
-  const { data: songs } = await supabase
+  const activeGenre = searchParams.genre ?? null
+
+  // Genre pills — distinct genres with counts
+  const { data: genreRows } = await supabase
+    .from('songs')
+    .select('genre')
+    .not('genre', 'is', null)
+    .eq('is_active', true)
+
+  const genreCounts: Record<string, number> = {}
+  for (const row of genreRows ?? []) {
+    if (row.genre) genreCounts[row.genre] = (genreCounts[row.genre] ?? 0) + 1
+  }
+  const topGenres = Object.entries(genreCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([g]) => g)
+
+  // Songs — filtered by genre if active
+  let songsQuery = supabase
     .from('songs')
     .select('*')
     .order('score', { ascending: false })
     .limit(50)
+
+  if (activeGenre) {
+    songsQuery = songsQuery.eq('genre', activeGenre)
+  }
+
+  const { data: songs } = await songsQuery
 
   const songIds = songs?.map((s) => s.id) ?? []
 
@@ -21,7 +50,6 @@ export default async function ChartsPage() {
         .order('created_at', { ascending: false })
     : { data: [] }
 
-  // Most recent chart_history position per song
   const lastPosition: Record<number, number> = {}
   if (history) {
     for (const row of history) {
@@ -53,6 +81,10 @@ export default async function ChartsPage() {
         .chart-row:hover { background: #131313; }
         .submit-btn { background: linear-gradient(90deg, #ff4500, #ff8c00); color: white; border: none; padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; transition: opacity 0.2s, transform 0.1s; display: inline-block; }
         .submit-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+        .genre-pill { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; text-decoration: none; border: 1px solid #222; transition: border-color 0.15s, background 0.15s, color 0.15s; white-space: nowrap; text-transform: capitalize; }
+        .genre-pill:hover { border-color: #ff6a00; color: #ff8c00; }
+        .genre-pill.active { background: linear-gradient(90deg, #ff4500, #ff8c00); border-color: transparent; color: #fff; }
+        .genre-pill.inactive { background: #0d0d0d; color: #555; }
       `}</style>
 
       <div style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', color: '#fff', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -78,6 +110,7 @@ export default async function ChartsPage() {
             </Link>
             <nav style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
               <Link href="/charts" className="nav-link active">Charts</Link>
+              <Link href="/genre" className="nav-link">Genres</Link>
               <a href="#" className="nav-link">Tools</a>
               <a href="#" className="nav-link">Blog</a>
               <Link href="/submit" className="submit-btn">Submit Song</Link>
@@ -87,15 +120,40 @@ export default async function ChartsPage() {
 
         <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '52px 24px 80px' }}>
 
-          <div style={{ marginBottom: '36px' }}>
+          <div style={{ marginBottom: '28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '6px' }}>
               <div style={{ width: '4px', height: '30px', background: 'linear-gradient(180deg, #ff4500, #ff8c00)', borderRadius: '2px', flexShrink: 0 }} />
-              <h1 style={{ fontSize: '26px', fontWeight: '700', letterSpacing: '-0.5px' }}>Top 50 Charts</h1>
+              <h1 style={{ fontSize: '26px', fontWeight: '700', letterSpacing: '-0.5px' }}>
+                {activeGenre ? (
+                  <span style={{ textTransform: 'capitalize' }}>{activeGenre} Charts</span>
+                ) : 'Top 50 Charts'}
+              </h1>
             </div>
             <p style={{ color: '#444', fontSize: '13px', paddingLeft: '18px' }}>
               Die meistbewerteten KI-generierten Songs — kuratiert von der Community
             </p>
           </div>
+
+          {/* Genre filter pills */}
+          {topGenres.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '32px' }}>
+              <Link
+                href="/charts"
+                className={`genre-pill ${!activeGenre ? 'active' : 'inactive'}`}
+              >
+                Alle
+              </Link>
+              {topGenres.map((genre) => (
+                <Link
+                  key={genre}
+                  href={`/charts?genre=${encodeURIComponent(genre)}`}
+                  className={`genre-pill ${activeGenre === genre ? 'active' : 'inactive'}`}
+                >
+                  {genre}
+                </Link>
+              ))}
+            </div>
+          )}
 
           {songs && songs.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: '52px 72px 1fr 140px 130px', gap: '16px', padding: '0 20px 10px', borderBottom: '1px solid #161616', marginBottom: '8px' }}>
@@ -177,10 +235,12 @@ export default async function ChartsPage() {
           ) : (
             <div style={{ marginTop: '24px', padding: '72px 32px', textAlign: 'center', border: '1px solid #161616', borderRadius: '12px', background: '#0d0d0d' }}>
               <p style={{ color: '#444', fontSize: '16px', marginBottom: '8px', fontWeight: '500' }}>
-                Noch keine Songs in der Datenbank
+                {activeGenre ? `Keine Songs im Genre "${activeGenre}" gefunden` : 'Noch keine Songs in der Datenbank'}
               </p>
               <p style={{ color: '#2a2a2a', fontSize: '13px' }}>
-                Charts erscheinen hier, sobald Songs hinzugefügt werden
+                {activeGenre && (
+                  <Link href="/charts" style={{ color: '#ff6a00', textDecoration: 'none' }}>← Alle Charts anzeigen</Link>
+                )}
               </p>
             </div>
           )}
