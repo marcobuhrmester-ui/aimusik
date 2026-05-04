@@ -8,6 +8,7 @@ export default async function Home() {
   const { data: songs } = await supabase
     .from('songs')
     .select('*')
+    .eq('is_active', true)
     .order('score', { ascending: false })
     .limit(10)
 
@@ -68,6 +69,7 @@ export default async function Home() {
             {/* Navigation */}
             <nav style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
               <Link href="/charts" className="nav-link">Charts</Link>
+              <Link href="/genre" className="nav-link">Genres</Link>
               <a href="#" className="nav-link">Tools</a>
               <a href="#" className="nav-link">Blog</a>
               <Link href="/submit" className="submit-btn">Submit Song</Link>
@@ -131,9 +133,16 @@ export default async function Home() {
                     <p style={{ fontWeight: '600', fontSize: '15px', color: '#f0f0f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {song.title}
                     </p>
-                    <p style={{ fontSize: '13px', color: '#555', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {song.artist_name}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginTop: '3px' }}>
+                      <p style={{ fontSize: '13px', color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                        {song.artist_name}
+                      </p>
+                      {song.genre && (
+                        <span style={{ flexShrink: 0, display: 'inline-block', padding: '2px 7px', borderRadius: '10px', fontSize: '10px', fontWeight: '600', background: '#161616', color: '#666', border: '1px solid #222', letterSpacing: '0.2px', whiteSpace: 'nowrap' }}>
+                          {song.genre}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* AI Tool Badge */}
