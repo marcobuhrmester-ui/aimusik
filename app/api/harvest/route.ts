@@ -68,6 +68,7 @@ interface DeezerTrack {
   id: number
   title: string
   artist: { name: string }
+  album: { id: number }
   link: string
 }
 
@@ -103,6 +104,36 @@ async function deezerGetPlaylistTracks(id: number): Promise<DeezerTrack[]> {
     return (data.data as DeezerTrack[]) ?? []
   } catch {
     return []
+  }
+}
+
+// Deezer genre names → our canonical names. Empty string = fall back to detectGenre.
+const DEEZER_GENRE_MAP: Record<string, string> = {
+  electro: 'Electronic', electronic: 'Electronic', dance: 'Electronic',
+  house: 'Electronic', techno: 'Electronic', edm: 'Electronic',
+  'hip hop': 'Hip-Hop', 'hip-hop': 'Hip-Hop', rap: 'Hip-Hop',
+  'r&b': 'R&B', soul: 'R&B',
+  pop: 'Pop', rock: 'Rock', metal: 'Metal', jazz: 'Jazz',
+  blues: 'Blues', classical: 'Classical', folk: 'Folk', country: 'Country',
+  ambient: 'Lo-Fi', chill: 'Lo-Fi',
+  indie: 'Rock', alternative: 'Rock',
+}
+
+function normalizeDeezerGenre(name: string): string {
+  const lower = name.toLowerCase()
+  for (const [key, val] of Object.entries(DEEZER_GENRE_MAP)) {
+    if (lower.includes(key)) return val
+  }
+  return ''
+}
+
+async function deezerGetAlbumGenre(albumId: number): Promise<string> {
+  try {
+    const data = await deezerFetch(`/album/${albumId}`)
+    const genres = (data.genres as { data: { name: string }[] } | undefined)?.data ?? []
+    return normalizeDeezerGenre(genres[0]?.name ?? '')
+  } catch {
+    return ''
   }
 }
 
@@ -285,6 +316,44 @@ async function youtubeSearchVideos(query: string, apiKey: string): Promise<YouTu
   }
 }
 
+// YouTube category IDs → genre. categoryId is not in search results;
+// we fetch it separately via /videos?part=snippet.
+const YOUTUBE_CATEGORY_GENRE: Record<string, string> = {
+  '10': 'Pop',        // Music (generic)
+  '24': 'Electronic', // Entertainment (often DJ/electronic content)
+  '1':  'Pop',        // Film & Animation
+  '2':  'Pop',        // Autos & Vehicles
+  '22': 'Pop',        // People & Blogs
+  '23': 'Pop',        // Comedy
+  '25': 'Pop',        // News & Politics
+  '26': 'Pop',        // Howto & Style
+  '28': 'Pop',        // Science & Technology
+}
+
+async function youtubeGetCategoryIds(
+  videoIds: string[],
+  apiKey: string,
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>()
+  for (let i = 0; i < videoIds.length; i += 50) {
+    try {
+      const url = new URL('https://www.googleapis.com/youtube/v3/videos')
+      url.searchParams.set('part', 'snippet')
+      url.searchParams.set('id', videoIds.slice(i, i + 50).join(','))
+      url.searchParams.set('key', apiKey)
+      const res = await fetch(url.toString(), { cache: 'no-store' })
+      if (!res.ok) continue
+      const json = await res.json()
+      for (const item of (json.items ?? []) as { id: string; snippet: { categoryId: string } }[]) {
+        result.set(item.id, item.snippet?.categoryId ?? '')
+      }
+    } catch {
+      // non-fatal: fall back to detectGenre for this batch
+    }
+  }
+  return result
+}
+
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
 function detectGenre(title: string, artist: string): string {
@@ -378,13 +447,20 @@ export async function GET(request: NextRequest) {
       const existingSet = await checkExistingIds('external_url', urls)
       stats.deezer.skipped = existingSet.size
 
-      const toInsert = uniqueValues
-        .filter((t) => !existingSet.has(t.link))
+      const newTracks = uniqueValues.filter((t) => !existingSet.has(t.link))
+
+      // Fetch album genres for new tracks only (parallel, unique album IDs)
+      const uniqueAlbumIds = Array.from(new Set(newTracks.map((t) => t.album?.id).filter(Boolean) as number[]))
+      const albumGenreResults = await Promise.all(uniqueAlbumIds.map(deezerGetAlbumGenre))
+      const albumGenreMap = new Map<number, string>()
+      uniqueAlbumIds.forEach((id, i) => { if (albumGenreResults[i]) albumGenreMap.set(id, albumGenreResults[i]) })
+
+      const toInsert = newTracks
         .map((t) => ({
           title: t.title,
           artist_name: t.artist.name,
           ai_tool: detectAITool(t.title, t.artist.name),
-          genre: detectGenre(t.title, t.artist.name),
+          genre: albumGenreMap.get(t.album?.id) || detectGenre(t.title, t.artist.name),
           external_url: t.link,
           score: 0,
           is_active: true,
@@ -478,19 +554,27 @@ export async function GET(request: NextRequest) {
       const existingSet = await checkExistingIds('youtube_id', youtubeIds)
       stats.youtube.skipped = existingSet.size
 
-      const toInsert = Array.from(unique.values())
-        .filter((v) => !existingSet.has(v.id))
-        .map((v) => ({
-          title: v.title,
-          artist_name: v.channelTitle,
-          ai_tool: detectAITool(v.title, v.channelTitle),
-          genre: detectGenre(v.title, v.channelTitle),
-          external_url: `https://www.youtube.com/watch?v=${v.id}`,
-          youtube_id: v.id,
-          cover_url: v.coverUrl || null,
-          score: 0,
-          is_active: true,
-        }))
+      const newVideos = Array.from(unique.values()).filter((v) => !existingSet.has(v.id))
+
+      // Fetch categoryIds for new videos only (batched, 50 IDs per request)
+      const categoryMap = await youtubeGetCategoryIds(newVideos.map((v) => v.id), apiKey)
+
+      const toInsert = newVideos
+        .map((v) => {
+          const catId = categoryMap.get(v.id) ?? ''
+          const genre = YOUTUBE_CATEGORY_GENRE[catId] ?? detectGenre(v.title, v.channelTitle)
+          return {
+            title: v.title,
+            artist_name: v.channelTitle,
+            ai_tool: detectAITool(v.title, v.channelTitle),
+            genre,
+            external_url: `https://www.youtube.com/watch?v=${v.id}`,
+            youtube_id: v.id,
+            cover_url: v.coverUrl || null,
+            score: 0,
+            is_active: true,
+          }
+        })
 
       for (let i = 0; i < toInsert.length; i += 50) {
         const batch = toInsert.slice(i, i + 50)
