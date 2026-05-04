@@ -358,6 +358,32 @@ async function youtubeGetCategoryIds(
 
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
+const AI_ARTIST_KEYWORDS = [
+  'suno', 'udio', ' ai ', 'ai music', 'aimusic', 'bot', 'neural', 'generated',
+  'synthetic', 'mubert', 'boomy', 'aiva', 'beatoven', 'soundraw', 'mureka',
+  'musicgen', 'loudly', 'beatbot', 'aiband', 'aiartist', 'artificialintelligence',
+]
+const AI_TITLE_KEYWORDS = [
+  'suno', 'udio', 'ai generated', 'ai music', 'neural', 'synthetic music',
+  'ai song', 'ai track', 'ai composed', 'ai produced', 'made by ai',
+]
+
+function isLikelyAIGenerated(title: string, artist: string): boolean {
+  const a = artist.toLowerCase()
+  const t = title.toLowerCase()
+
+  // Artist name contains an AI tool/keyword
+  if (AI_ARTIST_KEYWORDS.some((kw) => a.includes(kw))) return true
+
+  // Title contains an AI-specific phrase
+  if (AI_TITLE_KEYWORDS.some((kw) => t.includes(kw))) return true
+
+  // Artist name looks synthetic: mix of letters and digits (e.g. "SynthBot42", "AI_Artist_001")
+  if (/[a-z][0-9]|[0-9][a-z]/i.test(artist) && !/^the /i.test(artist)) return true
+
+  return false
+}
+
 function detectGenre(title: string, artist: string): string {
   const t = `${title} ${artist}`.toLowerCase()
   if (t.includes('hip hop') || t.includes('hiphop') || t.includes('rap')) return 'Hip-Hop'
@@ -449,7 +475,9 @@ export async function GET(request: NextRequest) {
       const existingSet = await checkExistingIds('external_url', urls)
       stats.deezer.skipped = existingSet.size
 
-      const newTracks = uniqueValues.filter((t) => !existingSet.has(t.link))
+      const newTracks = uniqueValues
+        .filter((t) => !existingSet.has(t.link))
+        .filter((t) => isLikelyAIGenerated(t.title, t.artist.name))
 
       // Fetch album genres for new tracks only (parallel, unique album IDs)
       const uniqueAlbumIds = Array.from(new Set(newTracks.map((t) => t.album?.id).filter(Boolean) as number[]))
@@ -514,6 +542,7 @@ export async function GET(request: NextRequest) {
 
       const toInsert = Array.from(unique.values())
         .filter((t) => !existingSet.has(t.id))
+        .filter((t) => isLikelyAIGenerated(t.name, t.artists.map((a: { name: string }) => a.name).join(' ')))
         .map((t) => ({
           title: t.name,
           artist_name: t.artists.map((a: { name: string }) => a.name).join(', '),
@@ -556,7 +585,9 @@ export async function GET(request: NextRequest) {
       const existingSet = await checkExistingIds('youtube_id', youtubeIds)
       stats.youtube.skipped = existingSet.size
 
-      const newVideos = Array.from(unique.values()).filter((v) => !existingSet.has(v.id))
+      const newVideos = Array.from(unique.values())
+        .filter((v) => !existingSet.has(v.id))
+        .filter((v) => isLikelyAIGenerated(v.title, v.channelTitle))
 
       // Fetch categoryIds for new videos only (batched, 50 IDs per request)
       const categoryMap = await youtubeGetCategoryIds(newVideos.map((v) => v.id), apiKey)
