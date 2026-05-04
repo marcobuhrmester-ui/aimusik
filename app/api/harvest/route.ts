@@ -86,15 +86,18 @@ let spotifyTokenCache: { token: string; expiresAt: number } | null = null
 
 async function getSpotifyToken(): Promise<string> {
   if (spotifyTokenCache && Date.now() < spotifyTokenCache.expiresAt) {
+    console.log('[Spotify] Token aus Cache, gültig bis', new Date(spotifyTokenCache.expiresAt).toISOString())
     return spotifyTokenCache.token
   }
 
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+  console.log('[Spotify] Token-Abruf: SPOTIFY_CLIENT_ID gesetzt:', !!clientId, '| SPOTIFY_CLIENT_SECRET gesetzt:', !!clientSecret)
   if (!clientId || !clientSecret) {
     throw new Error('SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET nicht gesetzt')
   }
 
+  console.log('[Spotify] POST https://accounts.spotify.com/api/token')
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
@@ -105,11 +108,15 @@ async function getSpotifyToken(): Promise<string> {
     cache: 'no-store',
   })
 
-  // Always parse body so we can surface the actual Spotify error message
-  const json = await res.json().catch(() => ({}))
+  const rawBody = await res.text()
+  console.log('[Spotify] Token-Response: HTTP', res.status, '| Body:', rawBody.slice(0, 500))
+
+  let json: Record<string, unknown> = {}
+  try { json = JSON.parse(rawBody) } catch { /* non-JSON body */ }
+
   if (!res.ok || typeof json.access_token !== 'string' || !json.access_token) {
     spotifyTokenCache = null
-    const detail = json.error_description ?? json.error ?? JSON.stringify(json)
+    const detail = json.error_description ?? json.error ?? rawBody.slice(0, 200)
     throw new Error(`Spotify Auth HTTP ${res.status}: ${detail}`)
   }
 
@@ -117,6 +124,7 @@ async function getSpotifyToken(): Promise<string> {
     token: json.access_token as string,
     expiresAt: Date.now() + ((json.expires_in as number) - 60) * 1000,
   }
+  console.log('[Spotify] Token erfolgreich, expires_in:', json.expires_in)
   return spotifyTokenCache.token
 }
 
@@ -126,15 +134,20 @@ async function spotifySearchTracks(query: string, token: string): Promise<Spotif
   url.searchParams.set('q', query)
   url.searchParams.set('type', 'track')
   url.searchParams.set('limit', '50')
-  const res = await fetch(url.toString(), {
+  const urlString = url.toString()
+  console.log('[Spotify] GET', urlString)
+  const res = await fetch(urlString, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
+    console.log('[Spotify] Fehler bei Query "' + query + '":', res.status, body.slice(0, 300))
     throw new Error(`HTTP ${res.status}: ${body.slice(0, 300)}`)
   }
   const json = await res.json()
+  const count = (json.tracks?.items as unknown[])?.length ?? 0
+  console.log('[Spotify] Query "' + query + '": ' + count + ' Tracks')
   return (json.tracks?.items as SpotifyTrack[]) ?? []
 }
 
