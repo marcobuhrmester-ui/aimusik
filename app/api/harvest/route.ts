@@ -124,6 +124,59 @@ async function spotifySearchTracks(query: string, token: string): Promise<Spotif
   }
 }
 
+// ─── YouTube ───────────────────────────────────────────────────────────────
+
+const YOUTUBE_QUERIES = [
+  'suno ai music',
+  'udio ai generated song',
+  'ai generated music 2025',
+  'artificial intelligence music',
+]
+
+interface YouTubeVideo {
+  id: string
+  title: string
+  channelTitle: string
+  coverUrl: string
+}
+
+async function youtubeSearchVideos(query: string, apiKey: string): Promise<YouTubeVideo[]> {
+  try {
+    const url = new URL('https://www.googleapis.com/youtube/v3/search')
+    url.searchParams.set('part', 'snippet')
+    url.searchParams.set('q', query)
+    url.searchParams.set('type', 'video')
+    url.searchParams.set('maxResults', '50')
+    url.searchParams.set('key', apiKey)
+
+    const res = await fetch(url.toString(), { cache: 'no-store' })
+    if (!res.ok) return []
+    const json = await res.json()
+
+    return ((json.items ?? []) as Record<string, unknown>[])
+      .filter((item) => {
+        const id = item.id as Record<string, unknown>
+        return typeof id?.videoId === 'string'
+      })
+      .map((item) => {
+        const id = item.id as Record<string, string>
+        const snippet = item.snippet as Record<string, unknown>
+        const thumbnails = (snippet.thumbnails ?? {}) as Record<string, { url: string }>
+        const coverUrl =
+          thumbnails.high?.url ?? thumbnails.medium?.url ?? thumbnails.default?.url ?? ''
+        return {
+          id: id.videoId,
+          title: (snippet.title as string) ?? '',
+          channelTitle: (snippet.channelTitle as string) ?? '',
+          coverUrl,
+        }
+      })
+      .filter((v) => v.id && v.title)
+  } catch {
+    return []
+  }
+}
+
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
 function detectAITool(title: string, artist: string): string {
@@ -154,6 +207,7 @@ export async function GET(request: NextRequest) {
   const stats = {
     deezer: { fetched: 0, inserted: 0, skipped: 0 },
     spotify: { fetched: 0, inserted: 0, skipped: 0 },
+    youtube: { fetched: 0, inserted: 0, skipped: 0 },
     errors: [] as string[],
   }
 
@@ -250,6 +304,55 @@ export async function GET(request: NextRequest) {
     }
   } catch (err) {
     stats.errors.push(`Spotify: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`)
+  }
+
+  // ── YouTube ─────────────────────────────────────────────────────────────
+
+  try {
+    const apiKey = process.env.YOUTUBE_API_KEY
+    if (!apiKey) throw new Error('YOUTUBE_API_KEY nicht gesetzt')
+
+    const searchResults = await Promise.all(YOUTUBE_QUERIES.map((q) => youtubeSearchVideos(q, apiKey)))
+    const allVideos = searchResults.flat()
+
+    const unique = new Map<string, YouTubeVideo>()
+    for (const v of allVideos) {
+      if (!unique.has(v.id)) unique.set(v.id, v)
+    }
+    stats.youtube.fetched = unique.size
+
+    if (unique.size > 0) {
+      const youtubeIds = Array.from(unique.keys())
+      const { data: existing } = await supabaseAdmin
+        .from('songs')
+        .select('youtube_id')
+        .in('youtube_id', youtubeIds)
+
+      const existingSet = new Set((existing ?? []).map((r) => r.youtube_id))
+      stats.youtube.skipped = existingSet.size
+
+      const toInsert = Array.from(unique.values())
+        .filter((v) => !existingSet.has(v.id))
+        .map((v) => ({
+          title: v.title,
+          artist_name: v.channelTitle,
+          ai_tool: detectAITool(v.title, v.channelTitle),
+          external_url: `https://www.youtube.com/watch?v=${v.id}`,
+          youtube_id: v.id,
+          cover_url: v.coverUrl || null,
+          score: 0,
+          is_active: true,
+        }))
+
+      for (let i = 0; i < toInsert.length; i += 50) {
+        const batch = toInsert.slice(i, i + 50)
+        const { error } = await supabaseAdmin.from('songs').insert(batch)
+        if (error) stats.errors.push(`YouTube batch ${Math.floor(i / 50) + 1}: ${error.message}`)
+        else stats.youtube.inserted += batch.length
+      }
+    }
+  } catch (err) {
+    stats.errors.push(`YouTube: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`)
   }
 
   return NextResponse.json(stats)
