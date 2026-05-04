@@ -133,7 +133,6 @@ async function spotifySearchTracks(query: string, token: string): Promise<Spotif
   const url = new URL('https://api.spotify.com/v1/search')
   url.searchParams.set('q', query)
   url.searchParams.set('type', 'track')
-  url.searchParams.set('limit', '50')
   const urlString = url.toString()
   console.log('[Spotify] GET', urlString)
   const res = await fetch(urlString, {
