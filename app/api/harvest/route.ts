@@ -356,6 +356,21 @@ async function youtubeGetCategoryIds(
   return result
 }
 
+function cleanDeezerArtistName(raw: string): string {
+  // Some Deezer tracks embed full metadata in the artist name field.
+  // Try to extract the real artist from "Artista: <name> <next-keyword>..." patterns.
+  if (/T[ií]tulo:|Artista:|Autor|Produtor/i.test(raw)) {
+    const m = raw.match(/Artista:\s*([^:\n]+?)(?:\s{2,}|\s+(?:Autor|Produtor|T[ií]tulo|G[eé]nero|Album|Label|℗|©)|$)/i)
+    if (m) return m[1].trim().slice(0, 80)
+    // Fallback: first "word group" before a colon-bearing section
+    const first = raw.split(/\s{2,}|\s+(?=\w+:)/)[0]
+    if (first && first.length < 80) return first.trim()
+  }
+  // Truncate names that are unreasonably long
+  if (raw.length > 80) return raw.slice(0, 80).trimEnd()
+  return raw
+}
+
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
 const AI_ARTIST_KEYWORDS = [
@@ -485,16 +500,25 @@ export async function GET(request: NextRequest) {
       const albumGenreMap = new Map<number, string>()
       uniqueAlbumIds.forEach((id, i) => { if (albumGenreResults[i]) albumGenreMap.set(id, albumGenreResults[i]) })
 
+      // Log rank of first new track so we can verify the field arrives from the API
+      if (newTracks.length > 0) {
+        const s = newTracks[0]
+        console.log(`[Deezer] Sample rank: id=${s.id} title="${s.title}" artist="${s.artist.name}" rank=${s.rank} → score=${Math.max(1, Math.round((s.rank ?? 0) / 1000))}`)
+      }
+
       const toInsert = newTracks
-        .map((t) => ({
-          title: t.title,
-          artist_name: t.artist.name,
-          ai_tool: detectAITool(t.title, t.artist.name),
-          genre: albumGenreMap.get(t.album?.id) || detectGenre(t.title, t.artist.name),
-          external_url: t.link,
-          score: Math.max(1, Math.round((t.rank ?? 0) / 1000)),
-          is_active: true,
-        }))
+        .map((t) => {
+          const artistName = cleanDeezerArtistName(t.artist.name)
+          return {
+            title: t.title,
+            artist_name: artistName,
+            ai_tool: detectAITool(t.title, artistName),
+            genre: albumGenreMap.get(t.album?.id) || detectGenre(t.title, artistName),
+            external_url: t.link,
+            score: Math.max(1, Math.round((t.rank ?? 0) / 1000)),
+            is_active: true,
+          }
+        })
 
       for (let i = 0; i < toInsert.length; i += 50) {
         const batch = toInsert.slice(i, i + 50)
