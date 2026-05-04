@@ -10,6 +10,9 @@ ALTER TABLE songs
 -- with any ai_tool value (including 'Andere' for undetected tools)
 ALTER TABLE songs DROP CONSTRAINT IF EXISTS songs_ai_tool_check;
 
+-- Spotify deduplication column
+ALTER TABLE songs ADD COLUMN IF NOT EXISTS spotify_id TEXT UNIQUE;
+
 -- 2. Chart history (last 4 weeks per song)
 CREATE TABLE IF NOT EXISTS chart_history (
   id         BIGSERIAL PRIMARY KEY,
