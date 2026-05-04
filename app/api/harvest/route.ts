@@ -110,63 +110,10 @@ async function deezerGetPlaylistTracks(id: number): Promise<DeezerTrack[]> {
 
 const SPOTIFY_QUERIES = [
   'suno ai',
-  'udio music',
-  'ai generated song',
+  'udio ai generated',
   'ai music 2025',
-  'ai music 2026',
   'artificial intelligence music',
-  'suno generated',
-  'udio generated',
-  'ai vocal music',
-  'ai pop song',
-  'ai rock song',
-  'ai hip hop ai',
-  'ai electronic music',
-  'ai country song',
-  'ai jazz music',
-  'ai blues song',
-  'ai metal song',
-  'ai folk music',
-  'ai rnb song',
-  'ai indie music',
-  'ai dance music',
-  'ai ambient music',
-  'ai classical music',
-  'ai reggae music',
-  'ai soul music',
-  'musicai generated',
-  'ai singer',
-  'ai band music',
-  'ai composer',
-  'ai produced music',
-  'boomy ai music',
-  'aiva music ai',
-  'mubert ai music',
-  'loudly ai music',
-  'beatoven ai',
-  'soundraw ai',
-  'ai music generator',
-  'neural music',
-  'deepmind music',
-  'machine learning music',
-  'ai written song',
-  'computer generated music',
-  'algorithmically generated music',
-  'synthetic music ai',
-  'ai music artist',
-  'ai pop artist',
-  'ai rock artist',
-  'ai music producer',
-  'generative music ai',
-  'ai music chart',
-]
-
-const SPOTIFY_PLAYLIST_IDS = [
-  '37i9dQZF1DX7rOY8MkBMFB',
-  '37i9dQZF1DWXIcbzpLauPS',
-  '7sOGAFTOgEfSiGFSNMwrOx',
-  '6tlNnSqPBEJmBxlXJpYJdx',
-  '2YRe7HZKkGGckSbm7rbHNm',
+  'ai generated music',
 ]
 
 interface SpotifyTrack {
@@ -223,7 +170,7 @@ async function getSpotifyToken(): Promise<string> {
 }
 
 async function spotifySearchTracks(query: string, token: string): Promise<SpotifyTrack[]> {
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
   console.log('[Spotify] GET', url)
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -237,27 +184,6 @@ async function spotifySearchTracks(query: string, token: string): Promise<Spotif
   const count = (json.tracks?.items as unknown[])?.length ?? 0
   console.log(`[Spotify] Query "${query}": ${count} Tracks`)
   return json.tracks?.items ?? []
-}
-
-async function spotifyGetPlaylistTracks(playlistId: string, token: string): Promise<SpotifyTrack[]> {
-  try {
-    const urlString = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=items(track(id,name,artists,external_urls))`
-    const res = await fetch(urlString, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) {
-      const body = await res.text().catch(() => '')
-      console.log(`[Spotify] Playlist ${playlistId} Fehler: ${res.status} ${body.slice(0, 200)}`)
-      return []
-    }
-    const json = await res.json()
-    return ((json.items ?? []) as { track: SpotifyTrack | null }[])
-      .map((item) => item.track)
-      .filter((t): t is SpotifyTrack => t != null && !!t.id && !!t.name && !!t.artists?.length)
-  } catch {
-    return []
-  }
 }
 
 // ─── YouTube ───────────────────────────────────────────────────────────────
@@ -478,12 +404,6 @@ export async function GET(request: NextRequest) {
         )
       }
     }
-
-    // Playlist tracks
-    const playlistResults = await Promise.all(
-      SPOTIFY_PLAYLIST_IDS.map((id) => spotifyGetPlaylistTracks(id, token)),
-    )
-    allTracks.push(...playlistResults.flat())
 
     const unique = new Map<string, SpotifyTrack>()
     for (const t of allTracks) {
