@@ -122,8 +122,11 @@ async function getSpotifyToken(): Promise<string> {
 
 // Throws on non-ok responses so the caller can surface the error
 async function spotifySearchTracks(query: string, token: string): Promise<SpotifyTrack[]> {
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=50`
-  const res = await fetch(url, {
+  const url = new URL('https://api.spotify.com/v1/search')
+  url.searchParams.set('q', query)
+  url.searchParams.set('type', 'track')
+  url.searchParams.set('limit', '50')
+  const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   })
