@@ -287,6 +287,23 @@ async function youtubeSearchVideos(query: string, apiKey: string): Promise<YouTu
 
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
+function detectGenre(title: string, artist: string): string {
+  const t = `${title} ${artist}`.toLowerCase()
+  if (t.includes('hip hop') || t.includes('hiphop') || t.includes('rap')) return 'Hip-Hop'
+  if (t.includes('r&b') || t.includes('rnb') || t.includes('soul')) return 'R&B'
+  if (t.includes('electronic') || t.includes('electro') || t.includes('techno') || t.includes('house') || t.includes('edm')) return 'Electronic'
+  if (t.includes('ambient') || t.includes('chill') || t.includes('lo-fi') || t.includes('lofi')) return 'Lo-Fi'
+  if (t.includes('classical') || t.includes('orchestra') || t.includes('piano')) return 'Classical'
+  if (t.includes('metal')) return 'Metal'
+  if (t.includes('jazz')) return 'Jazz'
+  if (t.includes('blues')) return 'Blues'
+  if (t.includes('country')) return 'Country'
+  if (t.includes('folk')) return 'Folk'
+  if (t.includes('rock')) return 'Rock'
+  if (t.includes('pop')) return 'Pop'
+  return 'Pop'
+}
+
 function detectAITool(title: string, artist: string): string {
   const t = `${title} ${artist}`.toLowerCase()
   if (t.includes('suno')) return 'Suno'
@@ -367,6 +384,7 @@ export async function GET(request: NextRequest) {
           title: t.title,
           artist_name: t.artist.name,
           ai_tool: detectAITool(t.title, t.artist.name),
+          genre: detectGenre(t.title, t.artist.name),
           external_url: t.link,
           score: 0,
           is_active: true,
@@ -422,6 +440,7 @@ export async function GET(request: NextRequest) {
           title: t.name,
           artist_name: t.artists.map((a: { name: string }) => a.name).join(', '),
           ai_tool: detectAITool(t.name, t.artists.map((a: { name: string }) => a.name).join(' ')),
+          genre: detectGenre(t.name, t.artists.map((a: { name: string }) => a.name).join(' ')),
           external_url: t.external_urls.spotify,
           spotify_id: t.id,
           score: 0,
@@ -465,6 +484,7 @@ export async function GET(request: NextRequest) {
           title: v.title,
           artist_name: v.channelTitle,
           ai_tool: detectAITool(v.title, v.channelTitle),
+          genre: detectGenre(v.title, v.channelTitle),
           external_url: `https://www.youtube.com/watch?v=${v.id}`,
           youtube_id: v.id,
           cover_url: v.coverUrl || null,
