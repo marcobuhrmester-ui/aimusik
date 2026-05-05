@@ -425,32 +425,39 @@ function detectGenre(title: string, artist: string): string {
 function detectAITool(title: string, artist: string): string {
   const ttl = title.toLowerCase()
   const art = artist.toLowerCase()
-  const both = `${ttl} ${art}`
 
-  // Check title first for explicit bracketed/parenthesised tags
-  if (ttl.includes('(ai suno)') || ttl.includes('[suno]')) return 'Suno'
-  if (ttl.includes('(ai udio)') || ttl.includes('[udio]')) return 'Udio'
+  // 1. Title keywords (highest confidence — user-supplied tags in the title)
+  if (ttl.includes('(ai suno)') || ttl.includes('[suno]') || ttl.includes('suno')) return 'Suno'
+  if (ttl.includes('(ai udio)') || ttl.includes('[udio]') || ttl.includes('udio')) return 'Udio'
+  if (ttl.includes('boomy')) return 'Boomy'
+  if (ttl.includes('aiva')) return 'AIVA'
+  if (ttl.includes('soundraw')) return 'Soundraw'
+  if (ttl.includes('beatoven')) return 'Beatoven'
+  if (ttl.includes('mubert')) return 'Mubert'
+  if (ttl.includes('musicgen') || ttl.includes('music gen')) return 'MusicGen'
+  if (ttl.includes('loudly')) return 'Loudly'
+  if (ttl.includes('riffusion')) return 'Riffusion'
+  if (ttl.includes('stable audio')) return 'Stable Audio'
+  if (ttl.includes('musiclm')) return 'MusicLM'
+  if (ttl.includes('bark ai') || ttl.includes('bark-ai')) return 'Bark'
+  if (ttl.includes('elevenlabs') || ttl.includes('eleven labs')) return 'ElevenLabs'
 
-  // Known channel aliases
+  // 2. Artist keywords
   if (art.includes('audiomachine')) return 'Udio'
-
-  // General keyword scan across title + artist
-  if (both.includes('suno')) return 'Suno'
-  if (both.includes('udio')) return 'Udio'
-  if (both.includes('aiva')) return 'AIVA'
-  if (both.includes('boomy')) return 'Boomy'
-  if (both.includes('soundraw')) return 'Soundraw'
-  if (both.includes('stable audio')) return 'Stable Audio'
-  if (both.includes('musicgen') || both.includes('music gen')) return 'MusicGen'
-  if (both.includes('elevenlabs') || both.includes('eleven labs')) return 'ElevenLabs'
-  if (both.includes('mubert')) return 'Mubert'
-  if (both.includes('beatoven')) return 'Beatoven'
-  if (both.includes('loudly')) return 'Loudly'
-  if (both.includes('riffusion')) return 'Riffusion'
-  if (both.includes('musiclm')) return 'MusicLM'
-  if (both.includes('bark ai') || both.includes('bark-ai')) return 'Bark'
-
-  // Generic AI band/artist label
+  if (art.includes('suno')) return 'Suno'
+  if (art.includes('udio')) return 'Udio'
+  if (art.includes('aiva')) return 'AIVA'
+  if (art.includes('boomy')) return 'Boomy'
+  if (art.includes('soundraw')) return 'Soundraw'
+  if (art.includes('stable audio')) return 'Stable Audio'
+  if (art.includes('musicgen') || art.includes('music gen')) return 'MusicGen'
+  if (art.includes('elevenlabs') || art.includes('eleven labs')) return 'ElevenLabs'
+  if (art.includes('mubert')) return 'Mubert'
+  if (art.includes('beatoven')) return 'Beatoven'
+  if (art.includes('loudly')) return 'Loudly'
+  if (art.includes('riffusion')) return 'Riffusion'
+  if (art.includes('musiclm')) return 'MusicLM'
+  if (art.includes('bark ai') || art.includes('bark-ai')) return 'Bark'
   if (art.includes('ai band') || art.includes('ai artist') || art.includes('ai singer')) return 'Andere KI'
 
   return 'Andere'
