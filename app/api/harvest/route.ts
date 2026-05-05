@@ -374,9 +374,11 @@ function cleanDeezerArtistName(raw: string): string {
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
 const AI_ARTIST_KEYWORDS = [
-  'suno', 'udio', ' ai ', 'ai music', 'aimusic', 'bot', 'neural', 'generated',
+  'suno', 'udio', 'suno ai', 'udio ai', 'ai artist', 'ai band', 'ai singer',
+  'ai composer', 'ai music', 'aimusic', 'bot', 'neural', 'generated',
   'synthetic', 'mubert', 'boomy', 'aiva', 'beatoven', 'soundraw', 'mureka',
   'musicgen', 'loudly', 'beatbot', 'aiband', 'aiartist', 'artificialintelligence',
+  'riffusion', 'stable audio', 'musiclm', 'bark ai', 'voicebox',
 ]
 const AI_TITLE_KEYWORDS = [
   'suno', 'udio', 'ai generated', 'ai music', 'neural', 'synthetic music',
@@ -392,9 +394,6 @@ function isLikelyAIGenerated(title: string, artist: string): boolean {
 
   // Title contains an AI-specific phrase
   if (AI_TITLE_KEYWORDS.some((kw) => t.includes(kw))) return true
-
-  // Artist name looks synthetic: mix of letters and digits (e.g. "SynthBot42", "AI_Artist_001")
-  if (/[a-z][0-9]|[0-9][a-z]/i.test(artist) && !/^the /i.test(artist)) return true
 
   return false
 }
