@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     .select('id, external_url')
     .is('preview_url', null)
     .like('external_url', '%deezer.com/track/%')
-    .limit(50)
+    .limit(10)
 
   if (fetchError) {
     return NextResponse.json({ error: fetchError.message }, { status: 500 })
@@ -26,34 +26,35 @@ export async function GET(request: NextRequest) {
   const rows = songs ?? []
   const stats = { checked: rows.length, updated: 0, skipped: 0, errors: [] as string[] }
 
-  await Promise.all(
-    rows.map(async (song) => {
-      // Extract numeric track ID from e.g. https://www.deezer.com/track/12345678
-      const match = song.external_url?.match(/deezer\.com\/track\/(\d+)/)
-      if (!match) { stats.skipped++; return }
-      const trackId = match[1]
+  for (let i = 0; i < rows.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 300))
 
-      try {
-        const res = await fetch(`https://api.deezer.com/track/${trackId}`, { cache: 'no-store' })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const json = await res.json()
-        if (json.error) throw new Error(json.error.message ?? 'Deezer error')
+    const song = rows[i]
+    // Extract numeric track ID from e.g. https://www.deezer.com/track/12345678
+    const match = song.external_url?.match(/deezer\.com\/track\/(\d+)/)
+    if (!match) { stats.skipped++; continue }
+    const trackId = match[1]
 
-        const preview: string | null = json.preview || null
-        if (!preview) { stats.skipped++; return }
+    try {
+      const res = await fetch(`https://api.deezer.com/track/${trackId}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      if (json.error) throw new Error(json.error.message ?? 'Deezer error')
 
-        const { error: updateError } = await supabaseAdmin
-          .from('songs')
-          .update({ preview_url: preview })
-          .eq('id', song.id)
+      const preview: string | null = json.preview || null
+      if (!preview) { stats.skipped++; continue }
 
-        if (updateError) throw new Error(updateError.message)
-        stats.updated++
-      } catch (err) {
-        stats.errors.push(`song ${song.id}: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }),
-  )
+      const { error: updateError } = await supabaseAdmin
+        .from('songs')
+        .update({ preview_url: preview })
+        .eq('id', song.id)
+
+      if (updateError) throw new Error(updateError.message)
+      stats.updated++
+    } catch (err) {
+      stats.errors.push(`song ${song.id}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
 
   return NextResponse.json(stats)
 }
