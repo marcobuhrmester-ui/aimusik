@@ -71,6 +71,7 @@ interface DeezerTrack {
   album: { id: number }
   link: string
   rank: number
+  preview?: string
 }
 
 async function deezerFetch(path: string): Promise<Record<string, unknown>> {
@@ -154,6 +155,7 @@ interface SpotifyTrack {
   artists: { name: string }[]
   external_urls: { spotify: string }
   popularity?: number
+  preview_url?: string | null
 }
 
 let spotifyTokenCache: { token: string; expiresAt: number } | null = null
@@ -546,6 +548,7 @@ export async function GET(request: NextRequest) {
             ai_tool: detectAITool(t.title, artistName),
             genre: albumGenreMap.get(t.album?.id) || detectGenre(t.title, artistName),
             external_url: t.link,
+            preview_url: t.preview || null,
             score: Math.max(1, Math.round((t.rank ?? 0) / 1000)),
             is_active: true,
           }
@@ -605,6 +608,7 @@ export async function GET(request: NextRequest) {
           genre: detectGenre(t.name, t.artists.map((a: { name: string }) => a.name).join(' ')),
           external_url: t.external_urls.spotify,
           spotify_id: t.id,
+          preview_url: t.preview_url || null,
           score: Math.max(1, t.popularity ?? 1),
           is_active: true,
         }))

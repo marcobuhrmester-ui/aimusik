@@ -17,6 +17,9 @@ ALTER TABLE songs ADD COLUMN IF NOT EXISTS spotify_id TEXT UNIQUE;
 ALTER TABLE songs ADD COLUMN IF NOT EXISTS youtube_id TEXT UNIQUE;
 ALTER TABLE songs ADD COLUMN IF NOT EXISTS cover_url  TEXT;
 
+-- 30-second preview MP3 (Deezer: track.preview, Spotify: track.preview_url)
+ALTER TABLE songs ADD COLUMN IF NOT EXISTS preview_url TEXT;
+
 -- Genre classification
 ALTER TABLE songs ADD COLUMN IF NOT EXISTS genre TEXT;
 CREATE INDEX IF NOT EXISTS songs_genre_idx ON songs (genre);
